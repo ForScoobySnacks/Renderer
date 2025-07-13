@@ -18,6 +18,7 @@ public:
 	VulkanRenderer();
 
 	int init(GLFWwindow* newWindow);
+	void draw();
 	void cleanup();
 
 	~VulkanRenderer();
@@ -54,6 +55,12 @@ private:
 	VkFormat swapChainImageFormat;
 	VkExtent2D swapChainExtent;
 
+	// Synchronisation
+	std::vector<VkSemaphore> imageAvailableSemaphores;
+	std::vector<VkSemaphore> renderFinishedSemaphores;
+	std::vector<VkFence> inFlightFences;
+
+	size_t currentFrame = 0;
 
 	// Vulkan Functions
 	// - Create Functions
@@ -67,6 +74,10 @@ private:
 	void createFramebuffers();
 	void createCommandPool();
 	void createCommandBuffers();
+	void createSynchronisation();
+
+	// Record Functions
+	void recordCommands();
 
 	// - Get Functions
 	void getPhysicalDevice();
