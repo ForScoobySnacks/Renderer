@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <array>
 
+#include "Mesh.h"
 #include "VulkanValidation.h"
 #include "Utilities.h"
 
@@ -19,12 +20,12 @@ public:
 
 	int init(GLFWwindow* newWindow);
 	void draw();
-	void cleanup();
-
-	~VulkanRenderer();
+	void cleanup(); 
 
 private:
 	GLFWwindow* window;
+
+	Mesh firstMesh;
 
 	// Vulkan Components
 	// Main
