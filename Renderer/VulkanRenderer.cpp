@@ -25,23 +25,41 @@ int VulkanRenderer::init(GLFWwindow* newWindow)
 		createSurface();
 		getPhysicalDevice();
 		createLogicalDevice();
-
-		std::vector<Vertex> meshVertices = {
-			{ {-0.4, -0.4, 0.0}, {1.0f, 0.0f, 0.0f} }, 
-			{ { 0.4, -0.4, 0.0}, {0.0f, 1.0f, 0.0f} }, 
-			{ {-0.4,  0.4, 0.0}, {0.0f, 0.0f, 1.0f} }, 
-
-			{ { 0.4, -0.4, 0.0}, {0.0f, 1.0f, 0.0f} }, 
-			{ { 0.4,  0.4, 0.0}, {1.0f, 1.0f, 0.0f} }, 
-			{ {-0.4,  0.4, 0.0}, {0.0f, 0.0f, 1.0f} }  
-		};
-		firstMesh = Mesh(mainDevice.physicalDevice, mainDevice.logicalDevice, &meshVertices);
-
 		createSwapChain();
 		createRenderPass();
 		createGraphicsPipeline();
 		createFramebuffers();
 		createCommandPool();
+
+		// Vertex Data
+		std::vector<Vertex> meshVertices = {
+			{ {0.0, -0.4, 0.0}, {1.0f, 0.0f, 0.0f} },
+			{ { 0.0, 0.4, 0.0}, {0.0f, 1.0f, 0.0f} },
+			{ { -0.8, 0.4, 0.0}, {0.0f, 0.0f, 1.0f} },
+			{ { -0.8,  -0.4, 0.0}, {1.0f, 1.0f, 0.0f} },
+		};
+
+		std::vector<Vertex> meshVertices2 = {
+			{ {0.9, -0.4, 0.0}, {1.0f, 0.0f, 0.0f} },
+			{ { 0.9, 0.4, 0.0}, {0.0f, 1.0f, 0.0f} },
+			{ { 0.1, 0.4, 0.0}, {0.0f, 0.0f, 1.0f} },
+			{ { 0.1,  -0.4, 0.0}, {1.0f, 1.0f, 0.0f} },
+		};
+
+		// Index Data
+		std::vector<uint32_t> meshIndices = {
+			0, 1, 2,
+			2, 3, 0
+		};
+
+		Mesh firstMesh = Mesh(mainDevice.physicalDevice, mainDevice.logicalDevice,
+			graphicsQueue, graphicsCommandPool, &meshVertices, &meshIndices);
+		Mesh secondMesh = Mesh(mainDevice.physicalDevice, mainDevice.logicalDevice,
+			graphicsQueue, graphicsCommandPool, &meshVertices2, &meshIndices);
+
+		meshList.push_back(firstMesh);
+		meshList.push_back(secondMesh);
+
 		createCommandBuffers();
 		recordCommands();
 		createSynchronisation();
@@ -108,7 +126,9 @@ void VulkanRenderer::cleanup()
 	// Wait until no actions being run on device before destroying
 	vkDeviceWaitIdle(mainDevice.logicalDevice);
 
-	firstMesh.destroyVertexBuffer();
+	for (size_t i = 0; i < meshList.size(); i++) {
+		meshList[i].destroyBuffers();
+	}
 	for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
 		vkDestroySemaphore(mainDevice.logicalDevice, renderFinishedSemaphores[i], nullptr);
 		vkDestroySemaphore(mainDevice.logicalDevice, imageAvailableSemaphores[i], nullptr);
@@ -712,12 +732,17 @@ void VulkanRenderer::recordCommands()
 				// Bind Pipeline to be used in render pass
 				vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
 
-				VkBuffer vertexBuffers[] = { firstMesh.getVertexBuffer() }; // Buffers to bind
-				VkDeviceSize offsets[] = { 0 }; // Offsets into buffers being bound
-				vkCmdBindVertexBuffers(commandBuffers[i], 0, 1, vertexBuffers, offsets); // Command to bind vertex buffer before drawing with
+				for (size_t j = 0; j < meshList.size(); j++) {
+					VkBuffer vertexBuffers[] = { meshList[j].getVertexBuffer()}; // Buffers to bind
+					VkDeviceSize offsets[] = { 0 }; // Offsets into buffers being bound
+					vkCmdBindVertexBuffers(commandBuffers[i], 0, 1, vertexBuffers, offsets); // Command to bind vertex buffer before drawing with
 
-				// Execute pipeline
-				vkCmdDraw(commandBuffers[i], static_cast<uint32_t>(firstMesh.getVertexCount()), 1, 0, 0);
+					// Bind mesh index buffer with 0 offset and using the uint32 type
+					vkCmdBindIndexBuffer(commandBuffers[i], meshList[j].getIndexBuffer(), 0, VK_INDEX_TYPE_UINT32);
+
+					// Execute pipeline
+					vkCmdDrawIndexed(commandBuffers[i], meshList[j].getIndexCount(), 1, 0, 0, 0);
+				}
 
 			vkCmdEndRenderPass(commandBuffers[i]);
 

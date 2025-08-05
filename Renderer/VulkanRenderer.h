@@ -25,7 +25,7 @@ public:
 private:
 	GLFWwindow* window;
 
-	Mesh firstMesh;
+	std::vector<Mesh> meshList;
 
 	// Vulkan Components
 	// Main
