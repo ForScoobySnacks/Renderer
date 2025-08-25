@@ -59,6 +59,7 @@ private:
 
 	// Descriptors
 	VkDescriptorSetLayout descriptorSetLayout;
+	VkPushConstantRange pushConstantRange;
 
 	VkDescriptorPool descriptorPool;
 	std::vector<VkDescriptorSet> descriptorSets;
@@ -69,9 +70,9 @@ private:
 	std::vector<VkBuffer> dynamicUniformBuffer;
 	std::vector<VkDeviceMemory> dynamicUniformBufferMemory;
 
-	VkDeviceSize minUnifromBufferOffset;
+	/*VkDeviceSize minUnifromBufferOffset;
 	size_t modelUniformAlignment;
-	UboModel* modelTransferSpace;
+	Model* modelTransferSpace;*/
 
 	// Pipeline
 	VkPipeline graphicsPipeline;
@@ -89,6 +90,7 @@ private:
 	std::vector<VkSemaphore> imageAvailableSemaphores;
 	std::vector<VkSemaphore> renderFinishedSemaphores;
 	std::vector<VkFence> inFlightFences;
+	std::vector<VkFence> imagesInFlight;
 
 	size_t currentFrame = 0;
 
@@ -101,6 +103,7 @@ private:
 	void createSwapChain();
 	void createRenderPass();
 	void createDescriptorSetLayout();
+	void createPushConstantRange();
 	void createGraphicsPipeline();
 	void createFramebuffers();
 	void createCommandPool();
@@ -114,13 +117,13 @@ private:
 	void updateUniformBuffers(uint32_t imageIndex);
 
 	// Record Functions
-	void recordCommands();
+	void recordCommands(uint32_t currentImage);
 
 	// - Get Functions
 	void getPhysicalDevice();
 
 	// Allocate Functions
-	void allocateDynamicBufferTransferSpace();
+	//void allocateDynamicBufferTransferSpace();
 
 	// - Support Functions
 	// -- Checker Functions

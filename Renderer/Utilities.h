@@ -6,7 +6,7 @@
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
 
-const int MAX_FRAMES_IN_FLIGHT = 2;
+const int MAX_FRAMES_IN_FLIGHT = 60;
 const int MAX_OBJECTS = 2;
 
 const std::vector<const char*> deviceExtensions = {

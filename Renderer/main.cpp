@@ -59,7 +59,7 @@ int main()
 		secondModel = glm::rotate(secondModel, glm::radians(-angle*100), glm::vec3(0.0f, 0.0f, 1.0f));
 
 		vulkanRenderer.updateModel(0, firstModel);
-		vulkanRenderer.updateModel(1, secondModel);
+		vulkanRenderer.updateModel(1, secondModel); 
 		vulkanRenderer.draw();
 	}
 
