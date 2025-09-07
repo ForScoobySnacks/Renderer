@@ -16,10 +16,12 @@ class Mesh
 public:
 	Mesh(VkPhysicalDevice newPhysicalDevice, VkDevice newDevice,
 		VkQueue transferQueue, VkCommandPool transferCommandPool, 
-		std::vector<Vertex>* vertices, std::vector<uint32_t>* indices);
+		std::vector<Vertex>* vertices, std::vector<uint32_t>* indices, int newTexId);
 
 	void setModel(glm::mat4 newModel);
 	Model getModel();
+
+	int getTexId();
 
 	Mesh();
 
@@ -32,6 +34,8 @@ public:
 	void destroyBuffers();
 private:
 	Model model;
+
+	int texId;
 
 	int vertexCount;
 	VkBuffer vertexBuffer;
