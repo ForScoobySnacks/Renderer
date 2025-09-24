@@ -42,6 +42,16 @@ private:
 		glm::mat4 view;
 	} uboViewProjection;
 
+	// Light
+// It secures the memory from the CPU, because of the std140
+	struct alignas(16) LightUBO {
+		glm::vec4 lightDir;
+		glm::vec4 lightCol;
+	};
+
+	std::vector<VkBuffer> lightUniformBuffer;
+	std::vector<VkDeviceMemory> lightUniformBufferMemory;
+
 	// Vulkan Components
 	// Main
 	VkInstance instance;
