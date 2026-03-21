@@ -1,6 +1,7 @@
 #include "VulkanRenderer.h"
 #include "VulkanValidation.h"
 #include "Utilities.h"
+#include "GLTFLoader.h"
 
 
 VulkanRenderer::VulkanRenderer() : 
@@ -42,13 +43,13 @@ int VulkanRenderer::init(GLFWwindow* newWindow)
 		createSynchronisation();
 
 		uboViewProjection.projection = glm::perspective(glm::radians(45.0f), (float)swapChainExtent.width / (float)swapChainExtent.height, 0.1f, 100.0f);
-		// Camera View
-		uboViewProjection.view = glm::lookAt(glm::vec3(3.0f, 1.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+		// Camera View glm::vec3(3.0f, 1.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f)
+		uboViewProjection.view = glm::lookAt(glm::vec3(3.0f, 5.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 
 		uboViewProjection.projection[1][1] *= -1;
 
 		// Vertex Data
-		std::vector<Vertex> meshVertices = {
+		/*std::vector<Vertex> meshVertices = {
 			// Position of it	// Colour of it
 			{ {-0.3, 0.3, 0.0}, {1.0f, 0.0f, 0.0f}, {1.0f, 1.0f}, {0.0f, 0.0f, 1.0f} },
 			{ { -0.3, -0.3, 0.0}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}, {0.0f, 0.0f, 1.0f} },
@@ -61,7 +62,7 @@ int VulkanRenderer::init(GLFWwindow* newWindow)
 			{ { -0.15, -0.2, 0.0}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}, {0.0f, 0.0f, 1.0f} },
 			{ { 0.4, -0.2, 0.0}, {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f}, {0.0f, 0.0f, 1.0f} },
 			{ { 0.4,  0.4, 0.0}, {1.0f, 1.0f, 0.0f}, {0.0f, 1.0f}, {0.0f, 0.0f, 1.0f} },
-		};
+		};*/
 
 		// Index Data
 		std::vector<uint32_t> meshIndices = {
@@ -69,13 +70,25 @@ int VulkanRenderer::init(GLFWwindow* newWindow)
 			2, 3, 0
 		};
 
-		Mesh firstMesh = Mesh(mainDevice.physicalDevice, mainDevice.logicalDevice,
+		int defaultTexId = createTexture("C:/Vulkan_C++/Renderer/Renderer/Textures/peter_griffin.jpg");
+
+		GLTFLoader loader(mainDevice.physicalDevice, mainDevice.logicalDevice, graphicsQueue,
+			graphicsCommandPool, [this](const std::string& texPath) { return this->createTexture(texPath); },
+			defaultTexId);
+
+		auto loadMeshes = loader.loadFromFile("C:/Vulkan_C++/Renderer/Renderer/Textures/Models/Duck.gltf", "C:/Vulkan_C++/Renderer/Renderer/Textures", {});
+		meshList.insert(meshList.end(), loadMeshes.begin(), loadMeshes.end());
+
+		auto loadMeshes2 = loader.loadFromFile("C:/Vulkan_C++/Renderer/Renderer/Textures/Models/Box.gltf", "C:/Vulkan_C++/Renderer/Renderer/Textures", {});
+		meshList.insert(meshList.end(), loadMeshes2.begin(), loadMeshes2.end());
+
+		/*Mesh firstMesh = Mesh(mainDevice.physicalDevice, mainDevice.logicalDevice,
 			graphicsQueue, graphicsCommandPool, &meshVertices, &meshIndices, createTexture("peter_griffin.jpg"));
 		Mesh secondMesh = Mesh(mainDevice.physicalDevice, mainDevice.logicalDevice,
 			graphicsQueue, graphicsCommandPool, &meshVertices2, &meshIndices, createTexture("peter_griffin.jpg"));
 
 		meshList.push_back(firstMesh);
-		meshList.push_back(secondMesh);
+		meshList.push_back(secondMesh);*/
 	}
 	catch (const std::runtime_error& e) {
 		printf("ERROR: %s\n", e.what());
@@ -1150,8 +1163,10 @@ void VulkanRenderer::recordCommands(uint32_t currentImage)
 			vkCmdPushConstants(commandBuffers[currentImage], pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT,
 				0, sizeof(Model), &model);
 
-			std::array<VkDescriptorSet, 2> descriptorSetGroup = { descriptorSets[currentImage],
-				samplerDescriptorSets[meshList[j].getTexId()] };
+			std::array<VkDescriptorSet, 2> descriptorSetGroup = { 
+				descriptorSets[currentImage],
+				samplerDescriptorSets[meshList[j].getTexId()] 
+			};
 
 			// Bind Descriptor Sets
 			vkCmdBindDescriptorSets(commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout,
@@ -1701,11 +1716,11 @@ stbi_uc* VulkanRenderer::loadTextureFile(std::string fileName, int* width, int* 
 	int channels;
 
 	// Load pixel data for image
-	std::string fileLoc = "Textures/" + fileName;
-	stbi_uc* image = stbi_load(fileLoc.c_str(), width, height, &channels, STBI_rgb_alpha);
+	//std::string fileLoc = "Textures/" + fileName;
+	stbi_uc* image = stbi_load(fileName.c_str(), width, height, &channels, STBI_rgb_alpha);
 
 	if (!image) {
-		std::runtime_error("Failed to load a Texture file! (" + fileName + ")");
+		throw std::runtime_error("Failed to load a Texture file! (" + fileName + ") IMAGE Uri: Textures/" + fileName);
 	}
 
 	// Calculate image size using given and known data
