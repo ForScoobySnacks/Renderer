@@ -179,6 +179,7 @@ void VulkanRenderer::cleanup()
 
 	vkDestroyDescriptorPool(mainDevice.logicalDevice, descriptorPool, nullptr);
 	vkDestroyDescriptorSetLayout(mainDevice.logicalDevice, descriptorSetLayout, nullptr);
+
 	for (size_t i = 0; i < swapChainImages.size(); i++) {
 		vkDestroyBuffer(mainDevice.logicalDevice, vpUniformBuffer[i], nullptr);
 		vkFreeMemory(mainDevice.logicalDevice, vpUniformBufferMemory[i], nullptr);
@@ -186,30 +187,39 @@ void VulkanRenderer::cleanup()
 		vkDestroyBuffer(mainDevice.logicalDevice, lightUniformBuffer[i], nullptr);
 		vkFreeMemory(mainDevice.logicalDevice, lightUniformBufferMemory[i], nullptr);
 	}
-	for (size_t i = 0; i < meshList.size(); i++) {
-		meshList[i].destroyBuffers();
-	}
+
+	std::for_each(meshList.begin(), meshList.end(), [](Mesh& mesh) {
+		mesh.destroyBuffers();
+	});
+
 	for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
 		vkDestroySemaphore(mainDevice.logicalDevice, renderFinishedSemaphores[i], nullptr);
 		vkDestroySemaphore(mainDevice.logicalDevice, imageAvailableSemaphores[i], nullptr);
 		vkDestroyFence(mainDevice.logicalDevice, inFlightFences[i], nullptr);
 	}
+
 	vkDestroyCommandPool(mainDevice.logicalDevice, graphicsCommandPool, nullptr);
-	for (auto framebuffer : swapChainFramebuffers) {
-		vkDestroyFramebuffer(mainDevice.logicalDevice, framebuffer, nullptr);
-	}
+
+	std::for_each(swapChainFramebuffers.begin(), swapChainFramebuffers.end(), [this](VkFramebuffer& frameBuffer) {
+		vkDestroyFramebuffer(mainDevice.logicalDevice, frameBuffer, nullptr);
+	});
+
 	vkDestroyPipeline(mainDevice.logicalDevice, graphicsPipeline, nullptr);
 	vkDestroyPipelineLayout(mainDevice.logicalDevice, pipelineLayout, nullptr);
 	vkDestroyRenderPass(mainDevice.logicalDevice, renderPass, nullptr);
-	for (auto image : swapChainImages) {
+
+	std::for_each(swapChainImages.begin(), swapChainImages.end(), [this](SwapChainImage& image) {
 		vkDestroyImageView(mainDevice.logicalDevice, image.imageView, nullptr);
-	}
+	});
+
 	vkDestroySwapchainKHR(mainDevice.logicalDevice, swapchain, nullptr);
 	vkDestroySurfaceKHR(instance, surface, nullptr);
 	vkDestroyDevice(mainDevice.logicalDevice, nullptr);
+
 	if (enableValidationLayers){
 		DestroyDebugReportCallbackEXT(instance, callback, nullptr);
 	}
+
 	vkDestroyInstance(instance, nullptr);
 }
 
@@ -439,13 +449,14 @@ void VulkanRenderer::createSwapChain()
 	std::vector<VkImage> images(swapChainImageCount);
 	vkGetSwapchainImagesKHR(mainDevice.logicalDevice, swapchain, &swapChainImageCount, images.data());
 
-	for (VkImage image : images) {
-		SwapChainImage swapChainImage = {};
-		swapChainImage.image = image;
-		swapChainImage.imageView = createImageView(image, swapChainImageFormat, VK_IMAGE_ASPECT_COLOR_BIT);
+	swapChainImages.resize(images.size());
 
-		swapChainImages.push_back(swapChainImage);
-	}
+	std::transform(images.begin(), images.end(), swapChainImages.begin(), [&](VkImage img) {
+		SwapChainImage swImage = {};
+		swImage.image = img;
+		swImage.imageView = createImageView(img, swapChainImageFormat, VK_IMAGE_ASPECT_COLOR_BIT);
+		return swImage;
+	});
 }
 
 void VulkanRenderer::createRenderPass()
@@ -1146,26 +1157,26 @@ void VulkanRenderer::recordCommands(uint32_t currentImage)
 		// Bind Pipeline to be used in render pass
 		vkCmdBindPipeline(commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
 
-		for (size_t j = 0; j < meshList.size(); j++) {
-			VkBuffer vertexBuffers[] = { meshList[j].getVertexBuffer()}; // Buffers to bind
+		for (auto& mesh : meshList) {
+			VkBuffer vertexBuffers[] = { mesh.getVertexBuffer()}; // Buffers to bind
 			VkDeviceSize offsets[] = { 0 }; // Offsets into buffers being bound
 			vkCmdBindVertexBuffers(commandBuffers[currentImage], 0, 1, vertexBuffers, offsets); // Command to bind vertex buffer before drawing with
 
 			// Bind mesh index buffer with 0 offset and using the uint32 type
-			vkCmdBindIndexBuffer(commandBuffers[currentImage], meshList[j].getIndexBuffer(), 0, VK_INDEX_TYPE_UINT32);
+			vkCmdBindIndexBuffer(commandBuffers[currentImage], mesh.getIndexBuffer(), 0, VK_INDEX_TYPE_UINT32);
 
 			// Dynamic Offset Amount
 			//uint32_t dynamicOffset = static_cast<uint32_t>(modelUniformAlignment) * j;
 
 			// Push constants to given shader stage directly (no buffer)
-			Model model = meshList[j].getModel();
+			Model model = mesh.getModel();
 
 			vkCmdPushConstants(commandBuffers[currentImage], pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT,
 				0, sizeof(Model), &model);
 
 			std::array<VkDescriptorSet, 2> descriptorSetGroup = { 
 				descriptorSets[currentImage],
-				samplerDescriptorSets[meshList[j].getTexId()] 
+				samplerDescriptorSets[mesh.getTexId()] 
 			};
 
 			// Bind Descriptor Sets
@@ -1173,7 +1184,7 @@ void VulkanRenderer::recordCommands(uint32_t currentImage)
 				0, static_cast<uint32_t>(descriptorSetGroup.size()), descriptorSetGroup.data(), 0, nullptr);
 
 			// Execute pipeline
-			vkCmdDrawIndexed(commandBuffers[currentImage], meshList[j].getIndexCount(), 1, 0, 0, 0);
+			vkCmdDrawIndexed(commandBuffers[currentImage], mesh.getIndexCount(), 1, 0, 0, 0);
 		}
 
 		vkCmdEndRenderPass(commandBuffers[currentImage]);
@@ -1201,24 +1212,21 @@ void VulkanRenderer::getPhysicalDevice()
 	std::vector<VkPhysicalDevice> deviceList(deviceCount);
 	vkEnumeratePhysicalDevices(instance, &deviceCount, deviceList.data());
 
-	for (const auto& device : deviceList)
-	{
-		if (checkDeviceSuitable(device))
-		{
-			mainDevice.physicalDevice = device;
-			break;
-		}
+	auto it = std::find_if(deviceList.begin(), deviceList.end(), [this](const auto& device) {
+		return checkDeviceSuitable(device);
+	});
+
+	if (it == deviceList.end()) {
+		throw std::runtime_error("Failed to find a suitable GPU!");
 	}
 
-	// Get properties of our new device
+	mainDevice.physicalDevice = *it;
+
+	/*// Get properties of our new device
 	VkPhysicalDeviceProperties deviceProperties;
 	vkGetPhysicalDeviceProperties(mainDevice.physicalDevice, &deviceProperties);
 
-	//minUnifromBufferOffset = deviceProperties.limits.minUniformBufferOffsetAlignment;
-
-	if (mainDevice.physicalDevice == VK_NULL_HANDLE) {
-		throw std::runtime_error("Failed to find a suitable GPU!");
-	}
+	//minUnifromBufferOffset = deviceProperties.limits.minUniformBufferOffsetAlignment;*/
 }
 
 /*void VulkanRenderer::allocateDynamicBufferTransferSpace()
@@ -1240,25 +1248,11 @@ bool VulkanRenderer::checkInstanceExtensionSupport(std::vector<const char*>* che
 	vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, extensions.data());
 
 	// Check if given extensions are in list of available extensions
-	for (const auto& checkExtension : *checkExtensions)
-	{
-		bool hasExtension = false;
-		for (const auto& extension : extensions)
-		{
-			if (strcmp(checkExtension, extension.extensionName) == 0)
-			{
-				hasExtension = true;
-				break;
-			}
-		}
-
-		if (!hasExtension)
-		{
-			return false;
-		}
-	}
-
-	return true;
+	return std::all_of(checkExtensions->begin(), checkExtensions->end(), [&](const char* checkName) {
+		return std::any_of(extensions.begin(), extensions.end(), [&](const auto& extension) {
+			return strcmp(checkName, extension.extensionName) == 0;
+		});
+	});
 }
 
 bool VulkanRenderer::checkDeviceExtensionSupport(VkPhysicalDevice device)
@@ -1278,25 +1272,11 @@ bool VulkanRenderer::checkDeviceExtensionSupport(VkPhysicalDevice device)
 	vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, extensions.data());
 
 	// Check for extension
-	for (const auto& deviceExtension : deviceExtensions)
-	{
-		bool hasExtension = false;
-		for (const auto& extension : extensions)
-		{
-			if (strcmp(deviceExtension, extension.extensionName) == 0)
-			{
-				hasExtension = true;
-				break;
-			}
-		}
-
-		if (!hasExtension)
-		{
-			return false;
-		}
-	}
-
-	return true;
+	return std::all_of(deviceExtensions.begin(), deviceExtensions.end(), [&](const char* deviceExtension) {
+		return std::any_of(extensions.begin(), extensions.end(), [&](const auto& extension) {
+			return strcmp(deviceExtension, extension.extensionName) == 0;
+		});
+	});
 }
 
 bool VulkanRenderer::checkValidationLayerSupport()
@@ -1315,25 +1295,11 @@ bool VulkanRenderer::checkValidationLayerSupport()
 	vkEnumerateInstanceLayerProperties(&validationLayerCount, availableLayers.data());
 
 	// Check if given Validation Layer is in list of given Validation Layers
-	for (const auto& validationLayer : validationLayers)
-	{
-		bool hasLayer = false;
-		for (const auto& availableLayer : availableLayers)
-		{
-			if (strcmp(validationLayer, availableLayer.layerName) == 0)
-			{
-				hasLayer = true;
-				break;
-			}
-		}
-
-		if (!hasLayer)
-		{
-			return false;
-		}
-	}
-
-	return true;
+	return std::all_of(validationLayers.begin(), validationLayers.end(), [&](const char* validationLayer) {
+		return std::any_of(availableLayers.begin(), availableLayers.end(), [&](const auto& availableLayer) {
+			return strcmp(validationLayer, availableLayer.layerName) == 0;
+		});
+	});
 }
 
 bool VulkanRenderer::checkDeviceSuitable(VkPhysicalDevice device)
@@ -1446,23 +1412,19 @@ VkSurfaceFormatKHR VulkanRenderer::chooseBestSurfaceFormat(const std::vector<VkS
 		return { VK_FORMAT_R8G8B8A8_UNORM, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR };
 	}
 	// With different algorithms it could be better
-	for (const auto& format : formats) {
-		if ((format.format == VK_FORMAT_R8G8B8A8_UNORM || format.format == VK_FORMAT_B8G8R8A8_UNORM) && format.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
-			return format;
-		}
-	}
+	auto it = std::find_if(formats.begin(), formats.end(), [](const auto& f) {
+		return (f.format == VK_FORMAT_R8G8B8A8_UNORM || f.format == VK_FORMAT_B8G8R8A8_UNORM)
+			&& f.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
+	});
 
-	return formats[0];
+	return (it != formats.end()) ? *it : formats[0];
 }
 
 VkPresentModeKHR VulkanRenderer::chooseBestPresentationMode(const std::vector<VkPresentModeKHR> presentationModes)
 {
-	for (const auto& presentationMode : presentationModes) {
-		if (presentationMode == VK_PRESENT_MODE_MAILBOX_KHR)
-			return presentationMode;
-	}
-
-	return VK_PRESENT_MODE_FIFO_KHR; // base presentation mode
+	auto it = std::find(presentationModes.begin(), presentationModes.end(), VK_PRESENT_MODE_MAILBOX_KHR);
+												// base presentation mode
+	return (it != presentationModes.end()) ? *it : VK_PRESENT_MODE_FIFO_KHR;
 }
 
 VkExtent2D VulkanRenderer::chooseSwapExtent(const VkSurfaceCapabilitiesKHR& surfaceCapabilities)
