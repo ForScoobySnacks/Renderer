@@ -30,10 +30,6 @@ int Mesh::getTexId()
 	return texId;
 }
 
-Mesh::Mesh()
-{
-}
-
 int Mesh::getVertexCount()
 {
 	return vertexCount;

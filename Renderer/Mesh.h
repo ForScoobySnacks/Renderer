@@ -23,8 +23,6 @@ public:
 
 	int getTexId();
 
-	Mesh();
-
 	int getVertexCount();
 	VkBuffer getVertexBuffer();
 
