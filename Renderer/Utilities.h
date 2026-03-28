@@ -14,10 +14,10 @@ const std::vector<const char*> deviceExtensions = {
 };
 
 struct Vertex {
-	glm::vec3 pos; // Vertex Position (x, y, z)
-	glm::vec3 col; // Vertex colour (r, g, b)
-	glm::vec2 tex; // Texture Coords (u, v)
-	glm::vec3 normal;
+	glm::vec3 pos = { 0.0f, 0.0f, 0.0f };; // Vertex Position (x, y, z)
+	glm::vec3 col = { 1.0f, 1.0f, 1.0f };; // Vertex colour (r, g, b)
+	glm::vec2 tex = { 0.0f, 0.0f };; // Texture Coords (u, v)
+	glm::vec3 normal = { 0.0f, 0.0f, 0.0f };;
 };
 
 // Indices (locations) of Queue Families (if they exist at all)
@@ -33,14 +33,14 @@ struct QueueFamilyIndices {
 };
 
 struct SwapChainDetails {
-	VkSurfaceCapabilitiesKHR surfaceCapabilities;		// Surface properties, e.g. image size/extent
-	std::vector<VkSurfaceFormatKHR> formats;			// Surface image formats, e.g. RGBA and size of each colour
-	std::vector<VkPresentModeKHR> presentationModes;	// How images should be presented to screen
+	VkSurfaceCapabilitiesKHR surfaceCapabilities = {};		// Surface properties, e.g. image size/extent
+	std::vector<VkSurfaceFormatKHR> formats = {};			// Surface image formats, e.g. RGBA and size of each colour
+	std::vector<VkPresentModeKHR> presentationModes = {};	// How images should be presented to screen
 };
 
 struct SwapChainImage {
-	VkImage image;
-	VkImageView imageView;
+	VkImage image = VK_NULL_HANDLE;
+	VkImageView imageView = VK_NULL_HANDLE;
 };
 
 static std::vector<char> readFile(const std::string& fileName) {
