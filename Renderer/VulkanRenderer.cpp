@@ -6,24 +6,19 @@
 VulkanRenderer* VulkanRenderer::getInstance(GLFWwindow* window)
 {
 	if (renderer == nullptr) {
-		renderer = std::unique_ptr<VulkanRenderer>(new VulkanRenderer());
+		renderer = std::make_unique<VulkanRenderer>();
+		renderer->window = window;
 
 		try {
-			renderer->window = window;
 			renderer->init();
 		}
 		catch (const std::exception& e) {
-			std::cerr << "Renderer initialization failed: " << e.what() << std::endl;
-
 			renderer.reset();
-			return nullptr;
+			throw e;
 		}
+	}
 
-		return renderer.get();
-	}
-	else {
-		return renderer.get();
-	}
+	return renderer.get();
 }
 
 void VulkanRenderer::init()

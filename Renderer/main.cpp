@@ -32,11 +32,6 @@ int main()
 	// Create Singleton Vulkan Renderer instance
 	VulkanRenderer* renderer = VulkanRenderer::getInstance(window);
 
-	if (renderer == nullptr)
-	{
-		return EXIT_FAILURE;
-	}
-
 	float angle = 0.0f;
 	float deltaTime = 0.0f;
 	float lastTime = 0.0f;
