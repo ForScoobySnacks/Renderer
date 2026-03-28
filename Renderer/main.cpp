@@ -11,7 +11,6 @@
 #include "VulkanRenderer.h"
 
 GLFWwindow* window;
-VulkanRenderer vulkanRenderer;
 
 void initWindow(std::string wName = "Test Window", const int width = 800, const int height = 600)
 {
@@ -30,8 +29,10 @@ int main()
 	// Create Window
 	initWindow("Test Window", 1366, 768);
 
-	// Create Vulkan Renderer instance
-	if (vulkanRenderer.init(window) == EXIT_FAILURE)
+	// Create Singleton Vulkan Renderer instance
+	VulkanRenderer* renderer = VulkanRenderer::getInstance(window);
+
+	if (renderer == nullptr)
 	{
 		return EXIT_FAILURE;
 	}
@@ -62,13 +63,13 @@ int main()
 		secondModel = glm::translate(secondModel, glm::vec3(0.5f, 0.0f, -1.5f));
 		secondModel = glm::rotate(secondModel, glm::radians(-angle * 2), glm::vec3(0.0f, 0.0f, 1.0f));
 
-		vulkanRenderer.updateModel(0, firstModel);
-		vulkanRenderer.updateModel(1, secondModel); 
+		renderer->updateModel(0, firstModel);
+		renderer->updateModel(1, secondModel);
 
-		vulkanRenderer.draw();
+		renderer->draw();
 	}
 
-	vulkanRenderer.cleanup();
+	renderer->deleteInstance();
 
 	// Destroy GLFW window and stop GLFW
 	glfwDestroyWindow(window);

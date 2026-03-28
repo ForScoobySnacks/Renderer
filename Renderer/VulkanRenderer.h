@@ -11,6 +11,7 @@
 #include <set>
 #include <algorithm>
 #include <array>
+#include <memory>
 
 #include "stb_image.h"
 
@@ -21,26 +22,39 @@
 class VulkanRenderer
 {
 public:
-	VulkanRenderer();
+	// Destructor which ensures that all Vulkan resources are released in the correct order
+	~VulkanRenderer();
 
-	int init(GLFWwindow* newWindow);
+	// Accessor for the Singleton instance
+	static VulkanRenderer* getInstance(GLFWwindow* window);
 
+	// Method to update the transormation matrix for a specific mesh
 	void updateModel(int modelId, glm::mat4 newModel);
 
-	void draw();
-	void cleanup(); 
+	void draw(); 
+	// Method to destroy the renderer instance
+	// IMPORTANT: The Developer has to call this function before window termination
+	static void deleteInstance();
+
+	// Deleted copy constructor to prevent multiple instances
+	VulkanRenderer(const VulkanRenderer&) = delete;
+	// Deleted assignment operator to prevent copying
+	VulkanRenderer& operator=(const VulkanRenderer&) = delete;
 
 private:
-	GLFWwindow* window;
+	// Singleton instance
+	inline static std::unique_ptr<VulkanRenderer> renderer = nullptr;
+
+	GLFWwindow* window = nullptr;
 
 	// Scene objects
-	std::vector<Mesh> meshList;
+	std::vector<Mesh> meshList = {};
 
 	// Scene settings
 	struct UboViewProjection {
 		glm::mat4 projection;
 		glm::mat4 view;
-	} uboViewProjection;
+	} uboViewProjection = {};
 
 	// Light
 // It secures the memory from the CPU, because of the std140
@@ -49,75 +63,75 @@ private:
 		glm::vec4 lightCol;
 	};
 
-	std::vector<VkBuffer> lightUniformBuffer;
-	std::vector<VkDeviceMemory> lightUniformBufferMemory;
+	std::vector<VkBuffer> lightUniformBuffer = {};
+	std::vector<VkDeviceMemory> lightUniformBufferMemory = {};
 
 	// Vulkan Components
 	// Main
-	VkInstance instance;
-	VkDebugReportCallbackEXT callback;
+	VkInstance instance = VK_NULL_HANDLE;
+	VkDebugReportCallbackEXT callback = VK_NULL_HANDLE;
 	struct {
-		VkPhysicalDevice physicalDevice;
-		VkDevice logicalDevice;
-	} mainDevice;
-	VkQueue graphicsQueue;
-	VkQueue presentationQueue;
-	VkSurfaceKHR surface;
-	VkSwapchainKHR swapchain;
+		VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
+		VkDevice logicalDevice = VK_NULL_HANDLE;
+	} mainDevice = {};
+	VkQueue graphicsQueue = VK_NULL_HANDLE;
+	VkQueue presentationQueue = VK_NULL_HANDLE;
+	VkSurfaceKHR surface = VK_NULL_HANDLE;
+	VkSwapchainKHR swapchain = VK_NULL_HANDLE;
 
-	std::vector<SwapChainImage> swapChainImages;
-	std::vector<VkFramebuffer> swapChainFramebuffers;
-	std::vector<VkCommandBuffer> commandBuffers;
+	std::vector<SwapChainImage> swapChainImages = {};
+	std::vector<VkFramebuffer> swapChainFramebuffers = {};
+	std::vector<VkCommandBuffer> commandBuffers = {};
 
-	VkImage depthBufferImage;
-	VkDeviceMemory depthBufferImageMemory;
-	VkImageView depthBufferImageView;
+	VkImage depthBufferImage = VK_NULL_HANDLE;
+	VkDeviceMemory depthBufferImageMemory = VK_NULL_HANDLE;
+	VkImageView depthBufferImageView = {};
 
 	// Descriptors
-	VkDescriptorSetLayout descriptorSetLayout;
-	VkDescriptorSetLayout samplerSetLayout;
-	VkPushConstantRange pushConstantRange;
+	VkDescriptorSetLayout descriptorSetLayout = VK_NULL_HANDLE;
+	VkDescriptorSetLayout samplerSetLayout = VK_NULL_HANDLE;
+	VkPushConstantRange pushConstantRange = {};
 
-	VkDescriptorPool descriptorPool;
-	VkDescriptorPool samplerDescriptorPool;
-	std::vector<VkDescriptorSet> descriptorSets;
-	std::vector<VkDescriptorSet> samplerDescriptorSets;
+	VkDescriptorPool descriptorPool = VK_NULL_HANDLE;
+	VkDescriptorPool samplerDescriptorPool = VK_NULL_HANDLE;
+	std::vector<VkDescriptorSet> descriptorSets = {};
+	std::vector<VkDescriptorSet> samplerDescriptorSets = {};
 
-	std::vector<VkBuffer> vpUniformBuffer;
-	std::vector<VkDeviceMemory> vpUniformBufferMemory;
+	std::vector<VkBuffer> vpUniformBuffer = {};
+	std::vector<VkDeviceMemory> vpUniformBufferMemory = {};
 
-	std::vector<VkBuffer> dynamicUniformBuffer;
-	std::vector<VkDeviceMemory> dynamicUniformBufferMemory;
-
-	/*VkDeviceSize minUnifromBufferOffset;
-	size_t modelUniformAlignment;
-	Model* modelTransferSpace;*/
+	std::vector<VkBuffer> dynamicUniformBuffer = {};
+	std::vector<VkDeviceMemory> dynamicUniformBufferMemory = {};
 
 	// Assets
-	VkSampler textureSampler;
-	std::vector<VkImage> textureImages;
-	std::vector<VkDeviceMemory> textureImageMemory;
-	std::vector<VkImageView> textureImageViews;
+	VkSampler textureSampler = VK_NULL_HANDLE;
+	std::vector<VkImage> textureImages = {};
+	std::vector<VkDeviceMemory> textureImageMemory = {};
+	std::vector<VkImageView> textureImageViews = {};
 
 	// Pipeline
-	VkPipeline graphicsPipeline;
-	VkPipelineLayout pipelineLayout;
-	VkRenderPass renderPass;
+	VkPipeline graphicsPipeline = VK_NULL_HANDLE;
+	VkPipelineLayout pipelineLayout = VK_NULL_HANDLE;
+	VkRenderPass renderPass = VK_NULL_HANDLE;
 
 	// Pools
-	VkCommandPool graphicsCommandPool;
+	VkCommandPool graphicsCommandPool = VK_NULL_HANDLE;
 
 	// Utilities
-	VkFormat swapChainImageFormat;
-	VkExtent2D swapChainExtent;
+	VkFormat swapChainImageFormat = VK_FORMAT_UNDEFINED;
+	VkExtent2D swapChainExtent = {};
 
 	// Synchronisation
-	std::vector<VkSemaphore> imageAvailableSemaphores;
-	std::vector<VkSemaphore> renderFinishedSemaphores;
-	std::vector<VkFence> inFlightFences;
-	std::vector<VkFence> imagesInFlight;
+	std::vector<VkSemaphore> imageAvailableSemaphores = {};
+	std::vector<VkSemaphore> renderFinishedSemaphores = {};
+	std::vector<VkFence> inFlightFences = {};
+	std::vector<VkFence> imagesInFlight = {};
 
 	size_t currentFrame = 0;
+
+	// Renderer initialization functions
+	void init();
+	VulkanRenderer() = default;
 
 	// Vulkan Functions
 	// - Create Functions

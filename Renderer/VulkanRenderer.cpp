@@ -3,99 +3,98 @@
 #include "Utilities.h"
 #include "GLTFLoader.h"
 
-
-VulkanRenderer::VulkanRenderer() : 
-	window(VK_NULL_HANDLE),
-	instance(VK_NULL_HANDLE),
-	callback(VK_NULL_HANDLE),
-	mainDevice{},
-	graphicsQueue(VK_NULL_HANDLE),
-	presentationQueue(VK_NULL_HANDLE),
-	surface(VK_NULL_HANDLE),
-	graphicsPipeline(VK_NULL_HANDLE)
+VulkanRenderer* VulkanRenderer::getInstance(GLFWwindow* window)
 {
+	if (renderer == nullptr) {
+		renderer = std::unique_ptr<VulkanRenderer>(new VulkanRenderer());
+
+		try {
+			renderer->window = window;
+			renderer->init();
+		}
+		catch (const std::exception& e) {
+			std::cerr << "Renderer initialization failed: " << e.what() << std::endl;
+
+			renderer.reset();
+			return nullptr;
+		}
+
+		return renderer.get();
+	}
+	else {
+		return renderer.get();
+	}
 }
 
-int VulkanRenderer::init(GLFWwindow* newWindow)
+void VulkanRenderer::init()
 {
-	window = newWindow;
+	createInstance();
+	createDebugCallback();
+	createSurface();
+	getPhysicalDevice();
+	createLogicalDevice();
+	createSwapChain();
+	createRenderPass();
+	createDescriptorSetLayout();
+	createPushConstantRange();
+	createGraphicsPipeline();
+	createDepthBufferImage();
+	createFramebuffers();
+	createCommandPool();
+	createCommandBuffers();
+	createTextureSampler();
+	createUniformBuffers();
+	createDescriptorPool();
+	createDescriptorSets();
+	createSynchronisation();
 
-	try {
-		createInstance();
-		createDebugCallback();
-		createSurface();
-		getPhysicalDevice();
-		createLogicalDevice();
-		createSwapChain();
-		createRenderPass();
-		createDescriptorSetLayout();
-		createPushConstantRange();
-		createGraphicsPipeline();
-		createDepthBufferImage();
-		createFramebuffers();
-		createCommandPool();
-		createCommandBuffers();
-		createTextureSampler();
-		//allocateDynamicBufferTransferSpace();
-		createUniformBuffers();
-		createDescriptorPool();
-		createDescriptorSets();
-		createSynchronisation();
+	uboViewProjection.projection = glm::perspective(glm::radians(45.0f), (float)swapChainExtent.width / (float)swapChainExtent.height, 0.1f, 100.0f);
+	// Camera View glm::vec3(3.0f, 1.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f)
+	uboViewProjection.view = glm::lookAt(glm::vec3(3.0f, 5.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 
-		uboViewProjection.projection = glm::perspective(glm::radians(45.0f), (float)swapChainExtent.width / (float)swapChainExtent.height, 0.1f, 100.0f);
-		// Camera View glm::vec3(3.0f, 1.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f)
-		uboViewProjection.view = glm::lookAt(glm::vec3(3.0f, 5.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+	uboViewProjection.projection[1][1] *= -1;
 
-		uboViewProjection.projection[1][1] *= -1;
+	// Vertex Data
+	/*std::vector<Vertex> meshVertices = {
+		// Position of it	// Colour of it
+		{ {-0.3, 0.3, 0.0}, {1.0f, 0.0f, 0.0f}, {1.0f, 1.0f}, {0.0f, 0.0f, 1.0f} },
+		{ { -0.3, -0.3, 0.0}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}, {0.0f, 0.0f, 1.0f} },
+		{ { 0.3, -0.3, 0.0}, {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f}, {0.0f, 0.0f, 1.0f} },
+		{ { 0.3,  0.3, 0.0}, {1.0f, 1.0f, 0.0f}, {0.0f, 1.0f}, {0.0f, 0.0f, 1.0f} },
+	};
 
-		// Vertex Data
-		/*std::vector<Vertex> meshVertices = {
-			// Position of it	// Colour of it
-			{ {-0.3, 0.3, 0.0}, {1.0f, 0.0f, 0.0f}, {1.0f, 1.0f}, {0.0f, 0.0f, 1.0f} },
-			{ { -0.3, -0.3, 0.0}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}, {0.0f, 0.0f, 1.0f} },
-			{ { 0.3, -0.3, 0.0}, {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f}, {0.0f, 0.0f, 1.0f} },
-			{ { 0.3,  0.3, 0.0}, {1.0f, 1.0f, 0.0f}, {0.0f, 1.0f}, {0.0f, 0.0f, 1.0f} },
-		};
+	std::vector<Vertex> meshVertices2 = {
+		{ {-0.15, 0.4, 0.0}, {1.0f, 0.0f, 0.0f}, {1.0f, 1.0f}, {0.0f, 0.0f, 1.0f} },
+		{ { -0.15, -0.2, 0.0}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}, {0.0f, 0.0f, 1.0f} },
+		{ { 0.4, -0.2, 0.0}, {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f}, {0.0f, 0.0f, 1.0f} },
+		{ { 0.4,  0.4, 0.0}, {1.0f, 1.0f, 0.0f}, {0.0f, 1.0f}, {0.0f, 0.0f, 1.0f} },
+	};*/
 
-		std::vector<Vertex> meshVertices2 = {
-			{ {-0.15, 0.4, 0.0}, {1.0f, 0.0f, 0.0f}, {1.0f, 1.0f}, {0.0f, 0.0f, 1.0f} },
-			{ { -0.15, -0.2, 0.0}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}, {0.0f, 0.0f, 1.0f} },
-			{ { 0.4, -0.2, 0.0}, {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f}, {0.0f, 0.0f, 1.0f} },
-			{ { 0.4,  0.4, 0.0}, {1.0f, 1.0f, 0.0f}, {0.0f, 1.0f}, {0.0f, 0.0f, 1.0f} },
-		};*/
+	// Index Data
+	std::vector<uint32_t> meshIndices = {
+		0, 1, 2,
+		2, 3, 0
+	};
 
-		// Index Data
-		std::vector<uint32_t> meshIndices = {
-			0, 1, 2,
-			2, 3, 0
-		};
+	int defaultTexId = createTexture("C:/Vulkan_C++/Renderer/Renderer/Textures/peter_griffin.jpg");
 
-		int defaultTexId = createTexture("C:/Vulkan_C++/Renderer/Renderer/Textures/peter_griffin.jpg");
+	GLTFLoader loader(mainDevice.physicalDevice, mainDevice.logicalDevice, graphicsQueue,
+		graphicsCommandPool, [this](const std::string& texPath) { return this->createTexture(texPath); },
+		defaultTexId);
 
-		GLTFLoader loader(mainDevice.physicalDevice, mainDevice.logicalDevice, graphicsQueue,
-			graphicsCommandPool, [this](const std::string& texPath) { return this->createTexture(texPath); },
-			defaultTexId);
+	auto loadMeshes = loader.loadFromFile("C:/Vulkan_C++/Renderer/Renderer/Textures/Models/Duck.gltf", "C:/Vulkan_C++/Renderer/Renderer/Textures", {});
+	meshList.insert(meshList.end(), loadMeshes.begin(), loadMeshes.end());
 
-		auto loadMeshes = loader.loadFromFile("C:/Vulkan_C++/Renderer/Renderer/Textures/Models/Duck.gltf", "C:/Vulkan_C++/Renderer/Renderer/Textures", {});
-		meshList.insert(meshList.end(), loadMeshes.begin(), loadMeshes.end());
+	auto loadMeshes2 = loader.loadFromFile("C:/Vulkan_C++/Renderer/Renderer/Textures/Models/Box.gltf", "C:/Vulkan_C++/Renderer/Renderer/Textures", {});
+	meshList.insert(meshList.end(), loadMeshes2.begin(), loadMeshes2.end());
 
-		auto loadMeshes2 = loader.loadFromFile("C:/Vulkan_C++/Renderer/Renderer/Textures/Models/Box.gltf", "C:/Vulkan_C++/Renderer/Renderer/Textures", {});
-		meshList.insert(meshList.end(), loadMeshes2.begin(), loadMeshes2.end());
+	/*Mesh firstMesh = Mesh(mainDevice.physicalDevice, mainDevice.logicalDevice,
+		graphicsQueue, graphicsCommandPool, &meshVertices, &meshIndices, createTexture("peter_griffin.jpg"));
+	Mesh secondMesh = Mesh(mainDevice.physicalDevice, mainDevice.logicalDevice,
+		graphicsQueue, graphicsCommandPool, &meshVertices2, &meshIndices, createTexture("peter_griffin.jpg"));
 
-		/*Mesh firstMesh = Mesh(mainDevice.physicalDevice, mainDevice.logicalDevice,
-			graphicsQueue, graphicsCommandPool, &meshVertices, &meshIndices, createTexture("peter_griffin.jpg"));
-		Mesh secondMesh = Mesh(mainDevice.physicalDevice, mainDevice.logicalDevice,
-			graphicsQueue, graphicsCommandPool, &meshVertices2, &meshIndices, createTexture("peter_griffin.jpg"));
-
-		meshList.push_back(firstMesh);
-		meshList.push_back(secondMesh);*/
-	}
-	catch (const std::runtime_error& e) {
-		printf("ERROR: %s\n", e.what());
-		return EXIT_FAILURE;
-	}
-
-	return 0;
+	meshList.push_back(firstMesh);
+	meshList.push_back(secondMesh);*/
 }
 
 void VulkanRenderer::updateModel(int modelId, glm::mat4 newModel)
@@ -155,7 +154,16 @@ void VulkanRenderer::draw()
 	currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
 }
 
-void VulkanRenderer::cleanup()
+// Method to destroy Singleton instance
+void VulkanRenderer::deleteInstance()
+{
+	if (renderer != nullptr) {
+		// Calling reset() deallocates the managed object and sets the pointer to nullptr
+		renderer.reset();
+	}
+}
+
+VulkanRenderer::~VulkanRenderer()
 {
 	// Wait until no actions being run on device before destroying
 	vkDeviceWaitIdle(mainDevice.logicalDevice);
@@ -216,7 +224,7 @@ void VulkanRenderer::cleanup()
 	vkDestroySurfaceKHR(instance, surface, nullptr);
 	vkDestroyDevice(mainDevice.logicalDevice, nullptr);
 
-	if (enableValidationLayers){
+	if (enableValidationLayers) {
 		DestroyDebugReportCallbackEXT(instance, callback, nullptr);
 	}
 
