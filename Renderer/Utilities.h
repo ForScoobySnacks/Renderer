@@ -5,9 +5,11 @@
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
+#include <vector>
 
-const int MAX_FRAMES_IN_FLIGHT = 20;
+const int MAX_FRAMES_IN_FLIGHT = 60;
 const int MAX_OBJECTS = 10;
+const std::string TEXTURES = "C:/Vulkan_C++/Renderer/Renderer/Textures/";
 
 const std::vector<const char*> deviceExtensions = {
 	VK_KHR_SWAPCHAIN_EXTENSION_NAME
@@ -78,6 +80,8 @@ static uint32_t findMemoryTypeIndex(VkPhysicalDevice physicalDevice, uint32_t al
 			return i;
 		}
 	}
+
+	throw std::runtime_error("Failed to find suitable memory type");
 }
 
 static void createBuffer(VkPhysicalDevice physicalDevice, VkDevice device, VkDeviceSize bufferSize, VkBufferUsageFlags bufferUsage,
@@ -218,8 +222,8 @@ static void transitionImageLayout(VkDevice device, VkQueue queue, VkCommandPool 
 	imageMemoryBarrier.subresourceRange.baseArrayLayer = 0; // First layer to start alterations on
 	imageMemoryBarrier.subresourceRange.layerCount = 1; // Number of layers to alter starting from baseArrayLayer
 
-	VkPipelineStageFlags srcStage;
-	VkPipelineStageFlags dstStage;
+	VkPipelineStageFlags srcStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+	VkPipelineStageFlags dstStage = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
 
 	// If transitioning from new image to image ready to receive data
 	if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED && newLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
@@ -235,6 +239,9 @@ static void transitionImageLayout(VkDevice device, VkQueue queue, VkCommandPool 
 		
 		srcStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
 		dstStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+	}
+	else {
+		throw std::invalid_argument("Unsupported layout transition!");
 	}
 
 	vkCmdPipelineBarrier(

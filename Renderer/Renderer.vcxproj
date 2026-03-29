@@ -138,13 +138,17 @@
     <ClCompile Include="GLTFLoader.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Mesh.cpp" />
+    <ClCompile Include="VulkanGpuResourcesFactory.cpp" />
     <ClCompile Include="VulkanRenderer.cpp" />
     <ClCompile Include="VulkanValidation.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="GLTFLoader.h" />
+    <ClInclude Include="GpuResources.h" />
+    <ClInclude Include="IGpuResourcesFactory.h" />
     <ClInclude Include="Mesh.h" />
     <ClInclude Include="Utilities.h" />
+    <ClInclude Include="VulkanGpuResourcesFactory.h" />
     <ClInclude Include="VulkanRenderer.h" />
     <ClInclude Include="VulkanValidation.h" />
   </ItemGroup>

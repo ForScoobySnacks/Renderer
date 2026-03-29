@@ -5,8 +5,8 @@
 
 VulkanRenderer* VulkanRenderer::getInstance(GLFWwindow* window)
 {
-	if (renderer == nullptr) {
-		renderer = std::make_unique<VulkanRenderer>();
+	if (!renderer) {
+		renderer = std::unique_ptr<VulkanRenderer>(new VulkanRenderer());
 		renderer->window = window;
 
 		try {
@@ -36,6 +36,15 @@ void VulkanRenderer::init()
 	createDepthBufferImage();
 	createFramebuffers();
 	createCommandPool();
+
+	GpuContext gpuContext{};
+	gpuContext.physical = mainDevice.physicalDevice;
+	gpuContext.device = mainDevice.logicalDevice;
+	gpuContext.graphicsQueue = graphicsQueue;
+	gpuContext.graphicsCommandPool = graphicsCommandPool;
+
+	gpuFactory = std::make_unique<VulkanGpuResourcesFactory>(gpuContext);
+
 	createCommandBuffers();
 	createTextureSampler();
 	createUniformBuffers();
@@ -71,16 +80,16 @@ void VulkanRenderer::init()
 		2, 3, 0
 	};
 
-	int defaultTexId = createTexture("C:/Vulkan_C++/Renderer/Renderer/Textures/peter_griffin.jpg");
+	int defaultTexId = createTexture( TEXTURES + "peter_griffin.jpg");
 
 	GLTFLoader loader(mainDevice.physicalDevice, mainDevice.logicalDevice, graphicsQueue,
 		graphicsCommandPool, [this](const std::string& texPath) { return this->createTexture(texPath); },
 		defaultTexId);
 
-	auto loadMeshes = loader.loadFromFile("C:/Vulkan_C++/Renderer/Renderer/Textures/Models/Duck.gltf", "C:/Vulkan_C++/Renderer/Renderer/Textures", {});
+	auto loadMeshes = loader.loadFromFile(TEXTURES + "Models/Duck.gltf", TEXTURES, {});
 	meshList.insert(meshList.end(), loadMeshes.begin(), loadMeshes.end());
 
-	auto loadMeshes2 = loader.loadFromFile("C:/Vulkan_C++/Renderer/Renderer/Textures/Models/Box.gltf", "C:/Vulkan_C++/Renderer/Renderer/Textures", {});
+	auto loadMeshes2 = loader.loadFromFile(TEXTURES + "Models/Box.gltf", TEXTURES, {});
 	meshList.insert(meshList.end(), loadMeshes2.begin(), loadMeshes2.end());
 
 	/*Mesh firstMesh = Mesh(mainDevice.physicalDevice, mainDevice.logicalDevice,
@@ -170,10 +179,10 @@ VulkanRenderer::~VulkanRenderer()
 
 	vkDestroySampler(mainDevice.logicalDevice, textureSampler, nullptr);
 
-	for (size_t i = 0; i < textureImages.size(); i++) {
-		vkDestroyImageView(mainDevice.logicalDevice, textureImageViews[i], nullptr);
-		vkDestroyImage(mainDevice.logicalDevice, textureImages[i], nullptr);
-		vkFreeMemory(mainDevice.logicalDevice, textureImageMemory[i], nullptr);
+	for (auto& texture : textures) {
+		vkDestroyImageView(mainDevice.logicalDevice, texture.view, nullptr);
+		vkDestroyImage(mainDevice.logicalDevice, texture.image.image, nullptr);
+		vkFreeMemory(mainDevice.logicalDevice, texture.image.memory, nullptr);
 	}
 
 	vkDestroyImageView(mainDevice.logicalDevice, depthBufferImageView, nullptr);
@@ -183,12 +192,14 @@ VulkanRenderer::~VulkanRenderer()
 	vkDestroyDescriptorPool(mainDevice.logicalDevice, descriptorPool, nullptr);
 	vkDestroyDescriptorSetLayout(mainDevice.logicalDevice, descriptorSetLayout, nullptr);
 
-	for (size_t i = 0; i < swapChainImages.size(); i++) {
-		vkDestroyBuffer(mainDevice.logicalDevice, vpUniformBuffer[i], nullptr);
-		vkFreeMemory(mainDevice.logicalDevice, vpUniformBufferMemory[i], nullptr);
+	for (auto& vpUniform : vpUniforms) {
+		vkDestroyBuffer(mainDevice.logicalDevice, vpUniform.buffer, nullptr);
+		vkFreeMemory(mainDevice.logicalDevice, vpUniform.memory, nullptr);
+	}
 
-		vkDestroyBuffer(mainDevice.logicalDevice, lightUniformBuffer[i], nullptr);
-		vkFreeMemory(mainDevice.logicalDevice, lightUniformBufferMemory[i], nullptr);
+	for (auto& lightUniform : lightUniforms) {
+		vkDestroyBuffer(mainDevice.logicalDevice, lightUniform.buffer, nullptr);
+		vkFreeMemory(mainDevice.logicalDevice, lightUniform.memory, nullptr);
 	}
 
 	std::for_each(meshList.begin(), meshList.end(), [](Mesh& mesh) {
@@ -570,14 +581,7 @@ void VulkanRenderer::createDescriptorSetLayout()
 	lightLayoutBinding.descriptorCount = 1;
 	lightLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT; // Use fragment shader
 	lightLayoutBinding.pImmutableSamplers = nullptr;
-	// Model binding info
-	/*VkDescriptorSetLayoutBinding modelLayoutBinding = {};
-	modelLayoutBinding.binding = 1;
-	modelLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC; // Type of descriptor (uniform, dynamic uniform, etc..)
-	modelLayoutBinding.descriptorCount = 1; // The number of value in the shader
-	modelLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT; // Shader stage to bind to
-	modelLayoutBinding.pImmutableSamplers = nullptr; // For Texture: Can make a sampler data unchangeable (immutable, only the sampler)
-	*/
+
 	std::vector<VkDescriptorSetLayoutBinding> layoutBindings = { vpLayoutBinding, lightLayoutBinding };
 
 	// Create descriptor set layout with given bindings
@@ -710,18 +714,6 @@ void VulkanRenderer::createGraphicsPipeline()
 	viewportStateCreateInfo.scissorCount = 1;
 	viewportStateCreateInfo.pScissors = &scissor;
 
-	// Dynamic States to enable
-	/*std::vector<VkDynamicState> dynamicStateEnables;
-	dynamicStateEnables.push_back(VK_DYNAMIC_STATE_VIEWPORT); // Can resize in command buffer width vkCmdSetViewport(commandbuffer, 0, 1, &viewport)
-	dynamicStateEnables.push_back(VK_DYNAMIC_STATE_SCISSOR); // Can resize in command buffer width vkCmdSetScissor(commandbuffer, 0, 1, &scissor)
-
-	// If I have to resize the window I have to recreate the swapchain
-
-	VkPipelineDynamicStateCreateInfo dynamicStateCreateInfo = {};
-	dynamicStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
-	dynamicStateCreateInfo.dynamicStateCount = static_cast<uint32_t>(dynamicStateEnables.size());
-	dynamicStateCreateInfo.pDynamicStates = dynamicStateEnables.data();*/
-
 	VkPipelineRasterizationStateCreateInfo rasterizerCreateInfo = {};
 	rasterizerCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
 	rasterizerCreateInfo.depthClampEnable = VK_FALSE; // Change if fragments beyond near/far planes are clipped (default) or clamped to plane
@@ -835,7 +827,7 @@ void VulkanRenderer::createDepthBufferImage()
 void VulkanRenderer::createFramebuffers()
 {
 	swapChainFramebuffers.resize(swapChainImages.size());
-	// Framebuffers for each swap chain image
+	// Framebuffers for each swapchain image
 	for (size_t i = 0; i < swapChainFramebuffers.size(); i++) {
 
 		std::array<VkImageView, 2> attachments = {
@@ -949,26 +941,20 @@ void VulkanRenderer::createUniformBuffers()
 
 	VkDeviceSize lightBufferSize = sizeof(LightUBO);
 
-	// Model buffer size
-	//VkDeviceSize modelBufferSize = modelUniformAlignment * MAX_OBJECTS;
-
 	// One uniform buffer for each image (and by extension, command buffer)
-	vpUniformBuffer.resize(swapChainImages.size());
-	vpUniformBufferMemory.resize(swapChainImages.size());
+	vpUniforms.resize(swapChainImages.size());
 
-	lightUniformBuffer.resize(swapChainImages.size());
-	lightUniformBufferMemory.resize(swapChainImages.size());
-
-	//dynamicUniformBuffer.resize(swapChainImages.size());
-	//dynamicUniformBufferMemory.resize(swapChainImages.size());
+	lightUniforms.resize(swapChainImages.size());
 
 	// Create Uniform buffers
 	for (size_t i = 0; i < swapChainImages.size(); i++) {
-		createBuffer(mainDevice.physicalDevice, mainDevice.logicalDevice, vpBufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &vpUniformBuffer[i], &vpUniformBufferMemory[i]);
+		vpUniforms[i] = gpuFactory->createBuffer(vpBufferSize,
+			VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
-		createBuffer(mainDevice.physicalDevice, mainDevice.logicalDevice, lightBufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &lightUniformBuffer[i], &lightUniformBufferMemory[i]);
+		lightUniforms[i] = gpuFactory->createBuffer(lightBufferSize,
+			VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 	}
 }
 
@@ -978,16 +964,11 @@ void VulkanRenderer::createDescriptorPool()
 	// Type of descriptors + how many DESCRIPTORS, not Descriptor Sets (combined makes the pool size)
 	VkDescriptorPoolSize vpPoolSize = {};
 	vpPoolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	vpPoolSize.descriptorCount = static_cast<uint32_t>(vpUniformBuffer.size());
+	vpPoolSize.descriptorCount = static_cast<uint32_t>(vpUniforms.size());
 
 	VkDescriptorPoolSize lightPoolSize = {};
 	lightPoolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	lightPoolSize.descriptorCount = static_cast<uint32_t>(lightUniformBuffer.size());
-
-	// Model Pool (Dynamic)
-	/*VkDescriptorPoolSize modelPoolSize = {};
-	modelPoolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
-	modelPoolSize.descriptorCount = static_cast<uint32_t>(dynamicUniformBuffer.size());*/
+	lightPoolSize.descriptorCount = static_cast<uint32_t>(lightUniforms.size());
 
 	// List of pools
 	std::vector<VkDescriptorPoolSize> descriptorPoolSizes = { vpPoolSize, lightPoolSize };
@@ -1048,7 +1029,7 @@ void VulkanRenderer::createDescriptorSets()
 		// View Projection Descriptor
 		// Buffer info and data offset info
 		VkDescriptorBufferInfo vpBufferInfo = {};
-		vpBufferInfo.buffer = vpUniformBuffer[i]; // Buffer to get data from
+		vpBufferInfo.buffer = vpUniforms[i].buffer; // Buffer to get data from
 		vpBufferInfo.offset = 0; // Position of start of data
 		vpBufferInfo.range = sizeof(UboViewProjection); // Size of data
 
@@ -1062,24 +1043,8 @@ void VulkanRenderer::createDescriptorSets()
 		vpSetWrite.descriptorCount = 1; // Amount to update
 		vpSetWrite.pBufferInfo = &vpBufferInfo; // Information about buffer data to bind
 
-		// Model Descriptor
-		// Model Buffer Binding Info
-		/*VkDescriptorBufferInfo modelBufferInfo = {};
-		modelBufferInfo.buffer = dynamicUniformBuffer[i];
-		modelBufferInfo.offset = 0;
-		modelBufferInfo.range = modelUniformAlignment;
-
-		VkWriteDescriptorSet modelSetWrite = {};
-		modelSetWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		modelSetWrite.dstSet = descriptorSets[i];
-		modelSetWrite.dstBinding = 1;
-		modelSetWrite.dstArrayElement = 0;
-		modelSetWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
-		modelSetWrite.descriptorCount = 1;
-		modelSetWrite.pBufferInfo = &modelBufferInfo;*/
-
 		VkDescriptorBufferInfo lightBufferInfo = {};
-		lightBufferInfo.buffer = lightUniformBuffer[i]; // Buffer to get data from
+		lightBufferInfo.buffer = lightUniforms[i].buffer; // Buffer to get data from
 		lightBufferInfo.offset = 0; // Position of start of data
 		lightBufferInfo.range = sizeof(LightUBO); // Size of data
 
@@ -1103,28 +1068,17 @@ void VulkanRenderer::updateUniformBuffers(uint32_t imageIndex)
 {
 	// Copy VP Data
 	void* data;
-	vkMapMemory(mainDevice.logicalDevice, vpUniformBufferMemory[imageIndex], 0, sizeof(UboViewProjection), 0, &data);
+	vkMapMemory(mainDevice.logicalDevice, vpUniforms[imageIndex].memory, 0, sizeof(UboViewProjection), 0, &data);
 	memcpy(data, &uboViewProjection, sizeof(UboViewProjection));
-	vkUnmapMemory(mainDevice.logicalDevice, vpUniformBufferMemory[imageIndex]);
+	vkUnmapMemory(mainDevice.logicalDevice, vpUniforms[imageIndex].memory);
 
 	LightUBO lightUbo{};		// To make it shine from above: vec4(0.0, 1.0, 0.0, 0.0)
 	lightUbo.lightDir = glm::vec4(-0.3f, -1.0f, -0.2f, 0.0f); // Direction 
 	lightUbo.lightCol = glm::vec4(1.5f, 1.5f, 1.5f, 0.0f); // White light
 
-	vkMapMemory(mainDevice.logicalDevice, lightUniformBufferMemory[imageIndex], 0, sizeof(LightUBO), 0, &data);
+	vkMapMemory(mainDevice.logicalDevice, lightUniforms[imageIndex].memory, 0, sizeof(LightUBO), 0, &data);
 	memcpy(data, &lightUbo, sizeof(LightUBO));
-	vkUnmapMemory(mainDevice.logicalDevice, lightUniformBufferMemory[imageIndex]);
-	
-	// Copy Model Data
-	/*for (size_t i = 0; i < meshList.size(); i++) {
-		Model* thisModel = (Model*)((uint64_t)modelTransferSpace + (i * modelUniformAlignment));
-		*thisModel = meshList[i].getModel();
-	}
-
-	// Map the list of model data
-	vkMapMemory(mainDevice.logicalDevice, dynamicUniformBufferMemory[imageIndex], 0, modelUniformAlignment * meshList.size(), 0, &data);
-	memcpy(data, modelTransferSpace, modelUniformAlignment * meshList.size());
-	vkUnmapMemory(mainDevice.logicalDevice, dynamicUniformBufferMemory[imageIndex]);*/
+	vkUnmapMemory(mainDevice.logicalDevice, lightUniforms[imageIndex].memory);
 }
 
 void VulkanRenderer::recordCommands(uint32_t currentImage)
@@ -1566,69 +1520,23 @@ VkShaderModule VulkanRenderer::createShaderModule(const std::vector<char>& code)
 
 int VulkanRenderer::createTextureImage(std::string fileName)
 {
-	// Load in the image file
 	int width, height;
 	VkDeviceSize imageSize;
-	stbi_uc* imageData = loadTextureFile(fileName, &width, &height, &imageSize);
+	stbi_uc* pixels = loadTextureFile(fileName, &width, &height, &imageSize);
 
-	// Create staging buffer to hold loaded data, ready to copy to device
-	VkBuffer imageStagingBuffer;
-	VkDeviceMemory imageStagingBufferMemory;
-	createBuffer(mainDevice.physicalDevice, mainDevice.logicalDevice, imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-		&imageStagingBuffer, &imageStagingBufferMemory);
+	TextureResource tex = gpuFactory->createTexture2DFromRGBA8(
+		pixels, (uint32_t)width, (uint32_t)height);
 
-	// Copy image data to staging buffer
-	void* data;
-	vkMapMemory(mainDevice.logicalDevice, imageStagingBufferMemory, 0, imageSize, 0, &data);
-	memcpy(data, imageData, static_cast<size_t>(imageSize));
-	vkUnmapMemory(mainDevice.logicalDevice, imageStagingBufferMemory);
+	stbi_image_free(pixels);
 
-	stbi_image_free(imageData);
-
-	// Create image to hold final texture
-	VkImage texImage;
-	VkDeviceMemory texImageMemory;
-	texImage = createImage(width, height, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL,
-		VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &texImageMemory);
-
-	// Copy Data to Image
-	// Transition image to be DST for copy operation
-	transitionImageLayout(mainDevice.logicalDevice, graphicsQueue, graphicsCommandPool, 
-		texImage, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-	// Copy Image data
-	copyImageBuffer(mainDevice.logicalDevice, graphicsQueue, graphicsCommandPool, imageStagingBuffer, texImage, width, height);
-
-	// Transition image to be shader readable for shader usage
-	transitionImageLayout(mainDevice.logicalDevice, graphicsQueue, graphicsCommandPool,
-		texImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-
-	// Add texture data to vector for reference
-	textureImages.push_back(texImage);
-	textureImageMemory.push_back(texImageMemory);
-
-	// Destroy staging buffers
-	vkDestroyBuffer(mainDevice.logicalDevice, imageStagingBuffer, nullptr);
-	vkFreeMemory(mainDevice.logicalDevice, imageStagingBufferMemory, nullptr);
-
-	// Return index of a new texture image
-	return textureImages.size() - 1;
+	textures.push_back(tex);
+	return (int)textures.size() - 1;
 }
 
 int VulkanRenderer::createTexture(std::string fileName)
 {
-	// Create texture image and get its location in a array
-	int textureImageLoc = createTextureImage(fileName);
-
-	// Create Image View and add to list
-	VkImageView imageView = createImageView(textureImages[textureImageLoc], VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
-	textureImageViews.push_back(imageView);
-
-	// Create Texture Descriptor
-	int descriptorLoc = createTextureDescriptor(imageView);
-
-	// Return location of set with texture
-	return descriptorLoc;
+	int idx = createTextureImage(fileName);
+	return createTextureDescriptor(textures[idx].view);
 }
 
 int VulkanRenderer::createTextureDescriptor(VkImageView textureImage)
@@ -1672,7 +1580,7 @@ int VulkanRenderer::createTextureDescriptor(VkImageView textureImage)
 
 	// Return descriptor set location
 
-	return samplerDescriptorSets.size() - 1;
+	return static_cast<int>(samplerDescriptorSets.size() - 1);
 }
 
 stbi_uc* VulkanRenderer::loadTextureFile(std::string fileName, int* width, int* height, VkDeviceSize* imageSize)

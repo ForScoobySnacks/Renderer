@@ -18,6 +18,9 @@
 #include "Mesh.h"
 #include "VulkanValidation.h"
 #include "Utilities.h"
+#include "GpuResources.h"
+#include "IGpuResourcesFactory.h"
+#include "VulkanGpuResourcesFactory.h"
 
 class VulkanRenderer
 {
@@ -42,6 +45,8 @@ public:
 	VulkanRenderer& operator=(const VulkanRenderer&) = delete;
 
 private:
+	// vpUniform, lightUniform and texture factory
+	std::unique_ptr<IGpuResourcesFactory> gpuFactory = nullptr;
 	// Singleton instance
 	inline static std::unique_ptr<VulkanRenderer> renderer = nullptr;
 
@@ -63,8 +68,7 @@ private:
 		glm::vec4 lightCol;
 	};
 
-	std::vector<VkBuffer> lightUniformBuffer = {};
-	std::vector<VkDeviceMemory> lightUniformBufferMemory = {};
+	std::vector<BufferResource> lightUniforms;
 
 	// Vulkan Components
 	// Main
@@ -97,17 +101,14 @@ private:
 	std::vector<VkDescriptorSet> descriptorSets = {};
 	std::vector<VkDescriptorSet> samplerDescriptorSets = {};
 
-	std::vector<VkBuffer> vpUniformBuffer = {};
-	std::vector<VkDeviceMemory> vpUniformBufferMemory = {};
+	std::vector<BufferResource> vpUniforms = {};
 
 	std::vector<VkBuffer> dynamicUniformBuffer = {};
 	std::vector<VkDeviceMemory> dynamicUniformBufferMemory = {};
 
 	// Assets
 	VkSampler textureSampler = VK_NULL_HANDLE;
-	std::vector<VkImage> textureImages = {};
-	std::vector<VkDeviceMemory> textureImageMemory = {};
-	std::vector<VkImageView> textureImageViews = {};
+	std::vector<TextureResource> textures;
 
 	// Pipeline
 	VkPipeline graphicsPipeline = VK_NULL_HANDLE;
@@ -162,9 +163,6 @@ private:
 
 	// - Get Functions
 	void getPhysicalDevice();
-
-	// Allocate Functions
-	//void allocateDynamicBufferTransferSpace();
 
 	// - Support Functions
 	// -- Checker Functions
