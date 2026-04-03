@@ -1,7 +1,4 @@
 #include "VulkanRenderer.h"
-#include "VulkanValidation.h"
-#include "Utilities.h"
-#include "GLTFLoader.h"
 
 VulkanRenderer* VulkanRenderer::getInstance(GLFWwindow* window)
 {
@@ -23,6 +20,7 @@ VulkanRenderer* VulkanRenderer::getInstance(GLFWwindow* window)
 
 void VulkanRenderer::init()
 {
+	setupInput();
 	createInstance();
 	createDebugCallback();
 	createSurface();
@@ -54,7 +52,7 @@ void VulkanRenderer::init()
 
 	uboViewProjection.projection = glm::perspective(glm::radians(45.0f), (float)swapChainExtent.width / (float)swapChainExtent.height, 0.1f, 100.0f);
 	// Camera View glm::vec3(3.0f, 1.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f)
-	uboViewProjection.view = glm::lookAt(glm::vec3(3.0f, 5.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+	uboViewProjection.view = camera.getViewMatrix();//glm::lookAt(glm::vec3(3.0f, 5.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 
 	uboViewProjection.projection[1][1] *= -1;
 
@@ -108,6 +106,61 @@ void VulkanRenderer::updateModel(int modelId, glm::mat4 newModel)
 	meshList[modelId].setModel(newModel);
 }
 
+void VulkanRenderer::setupInput()
+{
+	// Allowing static callback functions to access class members
+	glfwSetWindowUserPointer(window, this);
+	// Register the static mouse callback function
+	glfwSetCursorPosCallback(window, VulkanRenderer::mouseCallback);
+	// Capture the cursor
+	glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+}
+
+void VulkanRenderer::mouseCallback(GLFWwindow* window, double xpos, double ypos)
+{
+	// Retrieve renderer
+	auto* vulkanRenderer = reinterpret_cast<VulkanRenderer*>(glfwGetWindowUserPointer(window));
+	if (!vulkanRenderer) return;
+
+	// Prevent camera jumps when the mouse first enters the window or focus is gained
+	if (vulkanRenderer->firstMouse) {
+		vulkanRenderer->lastMouseX = xpos;
+		vulkanRenderer->lastMouseY = ypos;
+		vulkanRenderer->firstMouse = false;
+		return;
+	}
+
+	// Calculate offset
+	float xoffset = static_cast<float>(xpos - vulkanRenderer->lastMouseX);
+	// Making the y angle inverted
+	float yoffset = static_cast<float>(vulkanRenderer->lastMouseY - ypos);
+
+	vulkanRenderer->lastMouseX = xpos;
+	vulkanRenderer->lastMouseY = ypos;
+
+	// Pass parameters for updating the angle
+	vulkanRenderer->camera.processMouse(xoffset, yoffset);
+}
+
+void VulkanRenderer::processInput(float deltaTime)
+{
+	// Check for sprinting
+	const bool fast = glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS;
+
+	// Update camera position
+	camera.processKeyboard(
+		glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS,
+		glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS, 
+		glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS,
+		glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS, 
+		deltaTime, 
+		fast
+	);
+
+	// Synchronise the UBO with the updated camera view matrix
+	uboViewProjection.view = camera.getViewMatrix();
+}
+
 void VulkanRenderer::draw()
 {
 	vkWaitForFences(mainDevice.logicalDevice, 1, &inFlightFences[currentFrame], VK_TRUE, std::numeric_limits<uint64_t>::max());
@@ -121,6 +174,12 @@ void VulkanRenderer::draw()
 	imagesInFlight[imageIndex] = inFlightFences[currentFrame];
 
 	vkResetFences(mainDevice.logicalDevice, 1, &inFlightFences[currentFrame]);
+
+	float now = static_cast<float>(glfwGetTime());
+	float dt = now - lastFrameTime;
+	lastFrameTime = now;
+
+	processInput(dt);
 
 	recordCommands(imageIndex);
 	updateUniformBuffers(imageIndex);

@@ -21,6 +21,8 @@
 #include "GpuResources.h"
 #include "IGpuResourcesFactory.h"
 #include "VulkanGpuResourcesFactory.h"
+#include "GLTFLoader.h"
+#include "Camera.h"
 
 class VulkanRenderer
 {
@@ -50,7 +52,24 @@ private:
 	// Singleton instance
 	inline static std::unique_ptr<VulkanRenderer> renderer = nullptr;
 
+	// Window
 	GLFWwindow* window = nullptr;
+
+	// Camera
+	Camera camera;
+
+	bool firstMouse = true;
+	double lastMouseX = 0.0;
+	double lastMouseY = 0.0;
+
+	float lastFrameTime = 0.0f;
+
+	// Method to stup inputs
+	void setupInput();
+	// Method to process keyboard inputs
+	void processInput(float deltaTime);
+	// Method to process mouse movement
+	static void mouseCallback(GLFWwindow* window, double xpos, double ypos);
 
 	// Scene objects
 	std::vector<Mesh> meshList = {};

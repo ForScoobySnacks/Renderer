@@ -41,6 +41,10 @@ int main()
 	{
 		glfwPollEvents();
 
+		if (glfwGetKey(window, GLFW_KEY_ESCAPE)) {
+			glfwSetWindowShouldClose(window, GLFW_TRUE);
+		}
+
 		float now = glfwGetTime();
 		deltaTime = now - lastTime;
 		lastTime = now;
