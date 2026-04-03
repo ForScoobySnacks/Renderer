@@ -176,10 +176,10 @@ void VulkanRenderer::draw()
 	vkResetFences(mainDevice.logicalDevice, 1, &inFlightFences[currentFrame]);
 
 	float now = static_cast<float>(glfwGetTime());
-	float dt = now - lastFrameTime;
+	float deltaTime = now - lastFrameTime;
 	lastFrameTime = now;
 
-	processInput(dt);
+	processInput(deltaTime);
 
 	recordCommands(imageIndex);
 	updateUniformBuffers(imageIndex);
