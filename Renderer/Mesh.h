@@ -30,6 +30,8 @@ public:
 	VkBuffer getIndexBuffer();
 
 	void destroyBuffers();
+
+	Mesh() = default;
 private:
 	Model model;
 
