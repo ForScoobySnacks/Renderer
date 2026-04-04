@@ -635,5 +635,6 @@ std::string GLTFLoader::joinPath(const std::string& root, const std::string& rel
     // Normalize and return the path:
     // - lexically_normal(): Cleans up the path by resolving dots ('.') and 
     //   parent directories ('..'), and removing redundant slashes.
-    return p.lexically_normal().string();
+    // - generic_string(): Platform independent string
+    return p.lexically_normal().generic_string();
 }

@@ -3,6 +3,7 @@
 #include <fstream>
 
 #define GLFW_INCLUDE_VULKAN
+#include <vulkan/vulkan.h>
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
 #include <vector>
@@ -206,8 +207,6 @@ static void copyImageBuffer(VkDevice device, VkQueue transferQueue, VkCommandPoo
 }
 
 static void transitionImageLayout(VkDevice device, VkQueue queue, VkCommandPool commandPool, VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout) {
-	
-	VkCommandBuffer commandBuffer = beginCommandBuffer(device, commandPool);
 
 	VkImageMemoryBarrier imageMemoryBarrier = {};
 	imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
@@ -243,6 +242,8 @@ static void transitionImageLayout(VkDevice device, VkQueue queue, VkCommandPool 
 	else {
 		throw std::invalid_argument("Unsupported layout transition!");
 	}
+
+	VkCommandBuffer commandBuffer = beginCommandBuffer(device, commandPool);
 
 	vkCmdPipelineBarrier(
 		commandBuffer,
